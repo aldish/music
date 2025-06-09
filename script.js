@@ -157,8 +157,16 @@ async function start() {
 }
 
 async function detect() {
+  // Tangkap frame terakhir dari elemen video
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  // Gunakan canvas sebagai input pendeteksian
   const result = await faceapi
-    .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+    .detectSingleFace(canvas, new faceapi.TinyFaceDetectorOptions())
     .withFaceExpressions();
 
   if (!result) {
@@ -198,7 +206,7 @@ async function detect() {
       </div>
     `;
   }).join('');
-  
 }
+
 
 start();
