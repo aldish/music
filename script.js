@@ -1,4 +1,6 @@
 const video = document.getElementById('video');
+const canvas = document.getElementById('canvas'); // Elemen canvas
+const captureButton = document.getElementById('captureButton'); // Tombol capture
 const status = document.getElementById('status');
 const playlistDiv = document.getElementById('playlist');
 
@@ -147,66 +149,106 @@ const playlistMap = {
 
 function getThumbnailFileName(title) {
     return `assets/thumbs/${title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '')}.jpg`;
-  }  
+}  
 
+// Fungsi start tidak banyak berubah, hanya memastikan model dimuat dan video dimulai.
 async function start() {
-  await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
-  await faceapi.nets.faceExpressionNet.loadFromUri('/models');
-  const stream = await navigator.mediaDevices.getUserMedia({ video: {} });
-  video.srcObject = stream;
+    try {
+        status.innerText = 'Memuat model...';
+        await Promise.all([
+            faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
+            faceapi.nets.faceExpressionNet.loadFromUri('/models')
+        ]);
+        
+        status.innerText = 'Mengakses kamera...';
+        const stream = await navigator.mediaDevices.getUserMedia({ video: {} });
+        video.srcObject = stream;
+        
+        video.onloadedmetadata = () => {
+            status.innerText = 'Kamera siap. Silakan ambil gambar.';
+            captureButton.disabled = false; // Aktifkan tombol setelah kamera siap
+        };
+
+    } catch (err) {
+        status.innerText = `Error: ${err.message}`;
+        console.error(err);
+    }
 }
 
-async function detect() {
-  // Tangkap frame terakhir dari elemen video
-  const canvas = document.createElement('canvas');
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+// ---- FUNGSI DETECT DIMODIFIKASI ----
+// Sekarang menerima 'input' yang bisa berupa video atau canvas
+async function detect(input) {
+    const result = await faceapi
+        .detectSingleFace(input, new faceapi.TinyFaceDetectorOptions())
+        .withFaceExpressions();
 
-  // Gunakan canvas sebagai input pendeteksian
-  const result = await faceapi
-    .detectSingleFace(canvas, new faceapi.TinyFaceDetectorOptions())
-    .withFaceExpressions();
+    if (!result) {
+        status.innerText = '❌ Wajah tidak terdeteksi. Coba lagi.';
+        playlistDiv.innerHTML = '';
+        return;
+    }
 
-  if (!result) {
-    status.innerText = '❌ Wajah tidak terdeteksi.';
-    playlistDiv.innerHTML = '';
-    return;
-  }
+    const expressions = result.expressions;
+    const emotion = Object.entries(expressions)
+        .sort((a, b) => b[1] - a[1])[0][0];
 
-  const expressions = result.expressions;
-  const emotion = Object.entries(expressions)
-    .sort((a, b) => b[1] - a[1])[0][0];
+    status.innerText = `😊 Ekspresi terdeteksi: ${emotion}`;
 
-  status.innerText = `😊 Ekspresi terdeteksi: ${emotion}`;
+    const songList = playlistMap[emotion];
+    if (!songList) {
+        playlistDiv.innerHTML = `<p>⚠️ Belum ada lagu untuk ekspresi "${emotion}".</p>`;
+        return;
+    }
 
-  const songList = playlistMap[emotion];
-  if (!songList) {
-    playlistDiv.innerHTML = `<p>⚠️ Belum ada lagu untuk ekspresi "${emotion}".</p>`;
-    return;
-  }
+    const randomSongs = songList.sort(() => 0.5 - Math.random()).slice(0, 3);
 
-  // Ambil 3 lagu acak
-  const randomSongs = songList.sort(() => 0.5 - Math.random()).slice(0, 3);
-
-  playlistDiv.innerHTML = randomSongs.map((song, idx) => {
-    const thumbnail = getThumbnailFileName(song.title);
-    return `
-      <div class="song-card">
-        <img src="${thumbnail}" alt="Thumbnail" class="song-thumb"> 
-        <div class="song-info">
-          <strong>${song.artist}</strong><br>
-          <small>${song.title}</small><br>
-          <small>${song.album}</small>
-        </div>
-        <a href="${song.url}" target="_blank" class="play-btn">
-          <i class="fas fa-play"></i>
-        </a>
-      </div>
-    `;
-  }).join('');
+    playlistDiv.innerHTML = randomSongs.map((song, idx) => {
+        const thumbnail = getThumbnailFileName(song.title);
+        return `
+            <div class="song-card">
+                <img src="${thumbnail}" alt="Thumbnail" class="song-thumb">  
+                <div class="song-info">
+                    <strong>${song.artist}</strong><br>
+                    <small>${song.title}</small><br>
+                    <small>${song.album}</small>
+                </div>
+                <a href="${song.url}" target="_blank" class="play-btn">
+                    <i class="fas fa-play"></i>
+                </a>
+            </div>
+        `;
+    }).join('');
 }
 
 
+// ---- LOGIKA UTAMA: EVENT LISTENER UNTUK TOMBOL ----
+captureButton.addEventListener('click', async () => {
+    // 1. Dapatkan konteks 2D dari canvas
+    const context = canvas.getContext('2d');
+    
+    // 2. Set ukuran canvas sama dengan ukuran video
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    // 3. Gambar frame video saat ini ke canvas
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    // 4. Tampilkan canvas dan sembunyikan video
+    video.style.display = 'none';
+    canvas.style.display = 'block';
+    
+    // 5. Hentikan stream video untuk "membekukan" kamera
+    video.srcObject.getTracks().forEach(track => track.stop());
+    
+    // 6. Non-aktifkan tombol setelah mengambil gambar
+    captureButton.disabled = true;
+    status.innerText = 'Menganalisis ekspresi...';
+
+    // 7. Panggil fungsi deteksi pada CANVAS
+    await detect(canvas); 
+});
+
+
+// Panggil fungsi start untuk memulai semuanya
 start();
+captureButton.disabled = true; // Non-aktifkan tombol sampai kamera siap

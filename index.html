@@ -113,6 +113,13 @@
   </style>
 </head>
 <body>
+  <div class="video-box">
+      <video id="video" width="100%" height="100%" autoplay muted></video>
+    </div>
+  <div class="video-box">
+      <video id="video" width="100%" height="100%" autoplay muted playsinline></video>
+      <canvas id="canvas" width="320" height="240" style="display: none;"></canvas>
+    </div>
   <div class="container text-center">
     <img src="assets/logo-musicmotions.png" alt="Music Motions Logo" class="logo">
     <div class="video-box">
@@ -133,6 +140,7 @@
 </div>
     <div id="playlist" class="mt-4"></div>
   </div>
+  
 
   <!-- Bootstrap Bundle JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
