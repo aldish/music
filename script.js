@@ -1,6 +1,9 @@
 const video = document.getElementById('video');
 const status = document.getElementById('status');
 const playlistDiv = document.getElementById('playlist');
+const canvas = document.getElementById('snapshot');
+const ctx = canvas.getContext('2d');
+
 
 const playlistMap = {
   happy: [
@@ -157,6 +160,7 @@ async function start() {
 }
 
 async function detect() {
+  // Ambil ekspresi dari wajah
   const result = await faceapi
     .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
     .withFaceExpressions();
@@ -167,6 +171,17 @@ async function detect() {
     return;
   }
 
+  // ❄️ Freeze: ambil gambar dari frame video
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  video.style.display = 'none';
+  canvas.style.display = 'block';
+
+  // ❌ Stop stream video
+  const stream = video.srcObject;
+  const tracks = stream.getTracks();
+  tracks.forEach(track => track.stop());
+
+  // Deteksi ekspresi
   const expressions = result.expressions;
   const emotion = Object.entries(expressions)
     .sort((a, b) => b[1] - a[1])[0][0];
@@ -177,12 +192,11 @@ async function detect() {
   if (!songList) {
     playlistDiv.innerHTML = `<p>⚠️ Belum ada lagu untuk ekspresi "${emotion}".</p>`;
     return;
-  }
+  }  
 
-  // Ambil 3 lagu acak
   const randomSongs = songList.sort(() => 0.5 - Math.random()).slice(0, 3);
 
-  playlistDiv.innerHTML = randomSongs.map((song, idx) => {
+  playlistDiv.innerHTML = randomSongs.map((song) => {
     const thumbnail = getThumbnailFileName(song.title);
     return `
       <div class="song-card">
@@ -198,7 +212,13 @@ async function detect() {
       </div>
     `;
   }).join('');
-  
 }
+
+async function restartCamera() {
+  canvas.style.display = 'none';
+  video.style.display = 'block';
+  await start();
+}
+
 
 start();
