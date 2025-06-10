@@ -160,28 +160,28 @@ async function start() {
 }
 
 async function detect() {
-  // Ambil ekspresi dari wajah
   const result = await faceapi
     .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
     .withFaceExpressions();
 
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
   if (!result) {
     status.innerText = '❌ Wajah tidak terdeteksi.';
     playlistDiv.innerHTML = '';
+    canvas.style.display = 'none';
+    video.style.display = 'block';
     return;
   }
 
-  // ❄️ Freeze: ambil gambar dari frame video
+  // Gambar frame terakhir dari video ke canvas
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  // Sembunyikan video dan tampilkan canvas
   video.style.display = 'none';
   canvas.style.display = 'block';
 
-  // ❌ Stop stream video
-  const stream = video.srcObject;
-  const tracks = stream.getTracks();
-  tracks.forEach(track => track.stop());
-
-  // Deteksi ekspresi
   const expressions = result.expressions;
   const emotion = Object.entries(expressions)
     .sort((a, b) => b[1] - a[1])[0][0];
@@ -192,7 +192,7 @@ async function detect() {
   if (!songList) {
     playlistDiv.innerHTML = `<p>⚠️ Belum ada lagu untuk ekspresi "${emotion}".</p>`;
     return;
-  }  
+  }
 
   const randomSongs = songList.sort(() => 0.5 - Math.random()).slice(0, 3);
 
@@ -214,11 +214,9 @@ async function detect() {
   }).join('');
 }
 
-async function restartCamera() {
-  canvas.style.display = 'none';
+function resetVideo() {
+  document.getElementById('canvas').style.display = 'none';
   video.style.display = 'block';
-  await start();
 }
-
 
 start();
